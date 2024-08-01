@@ -53,8 +53,12 @@ import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.TileOverlay;
+import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
+import com.google.maps.android.heatmaps.HeatmapTileProvider;
+import com.google.maps.android.heatmaps.WeightedLatLng;
 
 import net.wigle.wigleandroid.background.KmlSurveyWriter;
 import net.wigle.wigleandroid.background.PooledQueryExecutor;
@@ -85,6 +89,9 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
 
     private Network network;
     private MapView mapView;
+    private HeatmapTileProvider provider;
+    private TileOverlay tileOverlay;
+    private final List<WeightedLatLng> weightedHeatmapPoints = new ArrayList<>();
     private int observations = 0;
     private boolean isDbResult = false;
     private final ConcurrentLinkedHashMap<LatLng, Integer> obsMap = new ConcurrentLinkedHashMap<>(512);
@@ -533,8 +540,17 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
                         .target(network.getLatLng()).zoom(DEFAULT_ZOOM).build();
                 googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 
+                LatLng networkCoordinate = network.getLatLng();
+                // apparently some initial data is required or the HeatmapTileProvider errors out
+                List<WeightedLatLng> dummyHeatmap = new ArrayList<>();
+                dummyHeatmap.add(new WeightedLatLng(networkCoordinate, 1.0));
+                provider = new HeatmapTileProvider.Builder()
+                        .weightedData(dummyHeatmap)
+                        .build();
+                tileOverlay = googleMap.addTileOverlay(new TileOverlayOptions().tileProvider(provider));
+
                 googleMap.addCircle(new CircleOptions()
-                        .center(network.getLatLng())
+                        .center(networkCoordinate)
                         .radius(5)
                         .fillColor(Color.argb(128, 240, 240, 240))
                         .strokeColor(Color.argb(200, 255, 32, 32))
@@ -711,7 +727,9 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
     @Override
     public void handleWiFiSeen(String bssid, Integer rssi, Location location) {
         LatLng latest = new LatLng(location.getLatitude(), location.getLongitude());
-        localObsMap.put(latest, new Observation(rssi, location.getLatitude(), location.getLongitude(), location.getAltitude()));
+        Observation obs = new Observation(rssi, location.getLatitude(), location.getLongitude(), location.getAltitude());
+        localObsMap.put(latest, obs);
+        weightedHeatmapPoints.add(obs.toWeightedData());
         final LatLng estCentroid = computeObservationLocation(localObsMap);
         final int zoomLevel = computeZoom(obsMap, estCentroid);
         mapView.getMapAsync(googleMap -> {
@@ -720,10 +738,8 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
                         .target(latest).zoom(zoomLevel).build();
                 googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
             }
-            BitmapDescriptor obsIcon = NetworkListUtil.getSignalBitmap(
-                    getApplicationContext(), rssi);
-            googleMap.addMarker(new MarkerOptions().icon(obsIcon)
-                    .position(latest).zIndex(rssi));
+            provider.setWeightedData(weightedHeatmapPoints);
+            tileOverlay.clearTileCache();
             Logging.info("survey observation added");
         });
     }

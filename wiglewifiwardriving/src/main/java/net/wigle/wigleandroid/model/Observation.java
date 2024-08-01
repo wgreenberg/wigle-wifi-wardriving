@@ -1,5 +1,8 @@
 package net.wigle.wigleandroid.model;
 
+import com.google.android.gms.maps.model.LatLng;
+import com.google.maps.android.heatmaps.WeightedLatLng;
+
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -26,6 +29,12 @@ public class Observation {
         this.longitude = longitude;
         this.elevationMeters = elevationMeters;
         this.formattedTime = sdf.format(new Date());
+    }
+
+    public WeightedLatLng toWeightedData() {
+        double intensity = (double) rssi / -100.0;
+        LatLng coordinate = new LatLng(latitude, longitude);
+        return new WeightedLatLng(coordinate, intensity);
     }
 
     public int getRssi() {
