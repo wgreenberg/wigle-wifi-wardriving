@@ -671,6 +671,7 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
         return netId;
     }
 
+    @SuppressLint("MissingPermission")
     @Override
     public void handleDialog(final int dialogId) {
         switch(dialogId) {
@@ -685,8 +686,19 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
                     startSurveyButton.setVisibility(View.GONE);
                     endSurveyButton.setVisibility(View.VISIBLE);
                     obsMap.clear();
-                    final String[] currentList = new String[]{network.getBssid()};
-                    final Set<String> registerSet = new HashSet<>(Arrays.asList(currentList));
+                    final List<String> currentList = new ArrayList<String>();
+                    currentList.add(network.getBssid());
+                    final String targetSsid = network.getSsid();
+                    final ConcurrentLinkedHashMap<String, Network> cache = MainActivity.getNetworkCache();
+                    for ( Network network : cache.values() ) {
+                        if ( targetSsid.equals( network.getSsid()) ) {
+                            currentList.add(network.getBssid());
+                        } else {
+                            Logging.info(targetSsid + " != " + network.getSsid());
+                        }
+                    }
+                    final Set<String> registerSet = new HashSet<>(currentList);
+                    Logging.info("monitoring: " + registerSet.toString());
                     state.wifiReceiver.registerWiFiScanUpdater(this, registerSet);
                     mapView.getMapAsync(googleMap -> {
                         googleMap.clear();
@@ -727,7 +739,7 @@ public class NetworkActivity extends ScreenChildActivity implements DialogListen
     @Override
     public void handleWiFiSeen(String bssid, Integer rssi, Location location) {
         LatLng latest = new LatLng(location.getLatitude(), location.getLongitude());
-        localObsMap.put(latest, new Observation(rssi, location.getLatitude(), location.getLongitude(), location.getAltitude()));
+        localObsMap.put(latest, new Observation(rssi, location.getLatitude(), location.getLongitude(), location.getAltitude(), bssid));
         final LatLng estCentroid = computeObservationLocation(localObsMap);
         final int zoomLevel = computeZoom(obsMap, estCentroid);
         mapView.getMapAsync(googleMap -> {

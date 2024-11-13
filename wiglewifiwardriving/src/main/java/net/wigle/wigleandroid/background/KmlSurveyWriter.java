@@ -23,6 +23,7 @@ import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -46,6 +47,11 @@ public class KmlSurveyWriter extends AbstractBackgroundTask {
         final String filename = WIWI_PREFIX +"_SITE_" + bssid+"_"+ fileDateFormat.format(new Date()) + KML_EXT;
         Status status = null;
 
+        final HashSet<String> bssids = new HashSet<String>();
+        for (Observation o : observations) {
+            bssids.add(o.getBssid());
+        }
+        Logging.info("writing KML for bssids " + bssids.toString());
 
         final FileOutputStream fos = FileUtility.createFile(context, filename, false);
         FileAccess.writeFos( fos, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -56,13 +62,21 @@ public class KmlSurveyWriter extends AbstractBackgroundTask {
                 +"<Style id=\"r_70_79\"><IconStyle><color>cc00ffff</color><scale>0.75</scale><Icon> <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LabelStyle><scale>0</scale></LabelStyle></Style>"
                 +"<Style id=\"r_60_69\"><IconStyle><color>cc00ffaa</color><scale>0.75</scale><Icon> <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LabelStyle><scale>0</scale></LabelStyle></Style>"
                 +"<Style id=\"r_50_59\"><IconStyle><color>cc00ff55</color><scale>0.75</scale><Icon> <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LabelStyle><scale>0</scale></LabelStyle></Style>"
-                +"<Style id=\"r_0_49\"><IconStyle><color>cc00ff00</color><scale>0.75</scale><Icon> <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LabelStyle><scale>0</scale></LabelStyle></Style>"
-                + "<Folder><name>"+bssid+"</name>\n" );
+                +"<Style id=\"r_0_49\"><IconStyle><color>cc00ff00</color><scale>0.75</scale><Icon> <href>http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png</href></Icon></IconStyle><LabelStyle><scale>0</scale></LabelStyle></Style>\n");
 
-        for (Observation o : observations) {
-            writeHeatmapPlacemark(fos, o);
+        for (String bssid : bssids) {
+            FileAccess.writeFos( fos, "<Folder><name>"+bssid+"</name>\n" );
+
+            for (Observation o : observations) {
+                if (!o.getBssid().equals(bssid)) {
+                    continue;
+                }
+                writeHeatmapPlacemark(fos, o);
+            }
+            FileAccess.writeFos( fos, "</Folder>\n" );
         }
-        FileAccess.writeFos( fos, "</Folder>\n</Document></kml>" );
+
+        FileAccess.writeFos( fos, "</Document></kml>");
         fos.close();
         bundle.putString( BackgroundGuiHandler.FILEPATH, FileUtility.getSDPath() + filename );
         bundle.putString( BackgroundGuiHandler.FILENAME, filename );
@@ -80,7 +94,10 @@ public class KmlSurveyWriter extends AbstractBackgroundTask {
         FileAccess.writeFos( fos, "<Placemark><name>"+observation.getFormattedTime()+observation.getRssi()+"</name><styleUrl>");
         FileAccess.writeFos( fos, getStyleStringForRssi(observation.getRssi()));
         FileAccess.writeFos( fos, "</styleUrl>");
-        FileAccess.writeFos( fos, "<ExtendedData><SchemaData><SimpleData name=\"signal\">"+observation.getRssi()+"</SimpleData></SchemaData></ExtendedData>");
+        FileAccess.writeFos( fos, "<ExtendedData><SchemaData>");
+        FileAccess.writeFos( fos, "<SimpleData name=\"signal\">"+observation.getRssi()+"</SimpleData>");
+        FileAccess.writeFos( fos, "<SimpleData name=\"bssid\">"+observation.getBssid()+"</SimpleData>");
+        FileAccess.writeFos( fos, "</SchemaData></ExtendedData>");
         FileAccess.writeFos( fos, "<Point><coordinates>"+observation.getLongitude()+","+observation.getLatitude()+","+ observation.getElevationMeters()+"</coordinates></Point></Placemark>");
     }
 

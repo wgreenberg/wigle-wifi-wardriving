@@ -13,6 +13,7 @@ public class Observation {
     private static DateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
     private int rssi;
     private String formattedTime;
+    private String bssid;
 
     private double latitude;
 
@@ -20,12 +21,13 @@ public class Observation {
 
     private double elevationMeters;
 
-    public Observation(final int rssi, final double latitude, final double longitude, final double elevationMeters) {
+    public Observation(final int rssi, final double latitude, final double longitude, final double elevationMeters, final String bssid) {
         this.rssi = rssi;
         this.latitude = latitude;
         this.longitude = longitude;
         this.elevationMeters = elevationMeters;
         this.formattedTime = sdf.format(new Date());
+        this.bssid = bssid;
     }
 
     public int getRssi() {
@@ -34,6 +36,10 @@ public class Observation {
 
     public String getFormattedTime() {
         return formattedTime;
+    }
+
+    public String getBssid() {
+        return bssid;
     }
 
     public double getLatitude() {
